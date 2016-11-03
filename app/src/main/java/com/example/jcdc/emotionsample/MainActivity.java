@@ -17,14 +17,19 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.example.jcdc.emotionsample.helper.ImageHelper;
+import com.example.jcdc.emotionsample.helper.StringHelper;
 import com.example.jcdc.emotionsample.model.Basic;
+import com.example.jcdc.emotionsample.model.Face;
+import com.example.jcdc.emotionsample.model.Scores;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.MultiplePermissionsReport;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -120,6 +125,24 @@ public class MainActivity extends AppCompatActivity {
         alertDialog.show();
     }
 
+    private void showEmotionDialog(String emotion){
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+                context);
+
+        alertDialogBuilder.setTitle("Emotion");
+        alertDialogBuilder
+                .setMessage(emotion)
+                .setCancelable(false)
+                .setNegativeButton("Yay!",new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog,int id) {
+                       dialog.dismiss();
+                    }
+                });
+
+        AlertDialog alertDialog = alertDialogBuilder.create();
+        alertDialog.show();
+    }
+
     private class UploadImage extends AsyncTask <String, Void, Basic>{
 
         ProgressDialog progressDialog;
@@ -150,8 +173,68 @@ public class MainActivity extends AppCompatActivity {
 
             if (basic != null){
                 Log.d("MainActivity", basic.getData().getLink());
+                new GetFace().execute(basic.getData().getLink());
             }else {
                 Toast.makeText(context, "Imgur error", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private class GetFace extends AsyncTask<String, Void, Face>{
+
+        ProgressDialog progressDialog;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            progressDialog = ProgressDialog.show(context, "Processing Image", "Is this really a face?", true);
+            progressDialog.setCancelable(true);
+            progressDialog.show();
+        }
+
+        @Override
+        protected Face doInBackground(String... strings) {
+            try{
+                return Face.getFace(strings[0]);
+            }catch (Exception e){
+
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Face face) {
+            super.onPostExecute(face);
+            progressDialog.hide();
+            if (face != null && face.getScores() != null){
+                Scores scores = face.getScores();
+
+                HashMap<String, Double> hm = new HashMap<>();
+                hm.put("anger", scores.getAnger());
+                hm.put("contempt", scores.getContempt());
+                hm.put("disgust", scores.getDisgust());
+                hm.put("fear", scores.getFear());
+                hm.put("happiness", scores.getHappiness());
+                hm.put("neutral", scores.getNeutral());
+                hm.put("sadness", scores.getSadness());
+                hm.put("surprise", scores.getSurprise());
+
+                Map.Entry<String, Double> maxEntry = null;
+
+                for (Map.Entry<String, Double> entry : hm.entrySet())
+                {
+                    if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0)
+                    {
+                        maxEntry = entry;
+                    }
+                }
+
+                Log.d("MainActivity", maxEntry.getKey());
+                showEmotionDialog(StringHelper.cap1stChar(maxEntry.getKey()));
+
+            }else {
+                Toast.makeText(context, "Emotion error", Toast.LENGTH_LONG).show();
             }
         }
     }
