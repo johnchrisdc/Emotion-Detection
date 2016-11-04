@@ -1,12 +1,12 @@
 package com.example.jcdc.emotionsample.model;
 
-import android.icu.text.MessagePattern;
-import android.util.Log;
-
 import com.example.jcdc.emotionsample.Variables;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import org.apache.commons.io.IOUtils;
+
+import java.io.InputStream;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 
@@ -41,26 +41,27 @@ public class Face {
         this.scores = scores;
     }
 
-    public static final MediaType JSON
-            = MediaType.parse("application/json; charset=utf-8");
+    public static final MediaType OCTET
+            = MediaType.parse("application/octet-stream; charset=utf-8");
 
-    public static Face getFace(String image_url) throws Exception{
+    public static Face getFace(InputStream image_url) throws Exception{
+        byte[] data = IOUtils.toByteArray(image_url);
 
         OkHttpClient client = new OkHttpClient();
 
-        RequestBody body = RequestBody.create(JSON, new Gson().toJson( new Image(image_url)));
+        RequestBody body = RequestBody.create(OCTET, data);
         Request request = new Request.Builder()
                 .url(Variables.oxford_url)
                 .addHeader("Ocp-Apim-Subscription-Key", "0ab1e875004a4d1d8a2b36ad828f6fb3")
-                .addHeader("Content-Type", "application/json")
+                .addHeader("Content-Type", "application/octet-stream")
                 .post(body)
                 .build();
 
         Response response = client.newCall(request).execute();
-        String data = response.body().string();
+        String data_ = response.body().string();
 
         Type arraysKoBeh = new TypeToken<ArrayList<Face>>(){}.getType();
-        return ((ArrayList<Face>) new Gson().fromJson(data, arraysKoBeh)).get(0); //Get the only one
+        return ((ArrayList<Face>) new Gson().fromJson(data_, arraysKoBeh)).get(0); //Get the only one
     }
 
 }

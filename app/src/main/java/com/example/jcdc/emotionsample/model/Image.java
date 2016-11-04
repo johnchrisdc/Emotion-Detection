@@ -5,17 +5,17 @@ package com.example.jcdc.emotionsample.model;
  */
 
 public class Image {
-    private String url;
+    byte[] data;
 
-    public String getUrl() {
-        return url;
+    public Image(byte[] data) {
+        this.data = data;
     }
 
-    public void setUrl(String url) {
-        this.url = url;
+    public byte[] getData() {
+        return data;
     }
 
-    public Image(String url) {
-        this.url = url;
+    public void setData(byte[] data) {
+        this.data = data;
     }
 }

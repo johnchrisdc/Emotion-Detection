@@ -6,7 +6,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -27,6 +30,11 @@ import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
 
     private MultiplePermissionsListener multiplePermissionsListener;
 
+    private Uri mUriPhotoTaken;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         multiplePermissionsListener = new MultiplePermissionsListener() {
             @Override
             public void onPermissionsChecked(MultiplePermissionsReport report) {
-                if (report.areAllPermissionsGranted()){
+                if (report.areAllPermissionsGranted()) {
                     openCamera();
                 } else {
                     showPermissionErrorDialog();
@@ -82,26 +92,50 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == CODE_CAMERA_ACTIVITY) {
-            if (resultCode == RESULT_OK){
-                Bitmap photo = (Bitmap) data.getExtras().get("data");
+            if (resultCode == RESULT_OK) {
+                if (resultCode == RESULT_OK) {
+                    Uri imageUri;
+                    if (data == null || data.getData() == null) {
+                        imageUri = mUriPhotoTaken;
+                    } else {
+                        imageUri = data.getData();
+                    }
 
-                if (photo != null){
-                    image.setImageBitmap(photo);
-                    new UploadImage().execute(ImageHelper.bitmapToBase64(photo));
-                }else {
-                    Log.e("MainActivity", "404 image !found");
+                    Bitmap bitmap = ImageHelper.loadSizeLimitedBitmapFromUri(
+                            imageUri, getContentResolver());
+
+                    image.setImageBitmap(bitmap);
+
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output);
+                    ByteArrayInputStream inputStream = new ByteArrayInputStream(output.toByteArray());
+
+                    Log.d("MainActivity", inputStream.toString());
+                    new GetFace().execute(inputStream);
                 }
             }
         }
 
     }
 
-    private void openCamera(){
-        Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-        startActivityForResult(cameraIntent, CODE_CAMERA_ACTIVITY);
+    private void openCamera() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        try {
+            File file = File.createTempFile("IMG_", ".jpg", storageDir);
+            mUriPhotoTaken = Uri.fromFile(file);
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, mUriPhotoTaken);
+            intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+            startActivityForResult(intent, CODE_CAMERA_ACTIVITY);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
-    private void showPermissionErrorDialog(){
+    private void showPermissionErrorDialog() {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
                 context);
 
@@ -109,14 +143,14 @@ public class MainActivity extends AppCompatActivity {
         alertDialogBuilder
                 .setMessage("This crappy app need permissions to capture images.")
                 .setCancelable(false)
-                .setPositiveButton("Try again",new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog,int id) {
+                .setPositiveButton("Try again", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
                         if (!Dexter.isRequestOngoing())
                             Dexter.checkPermissions(multiplePermissionsListener, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA);
                     }
                 })
-                .setNegativeButton("Exit",new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog,int id) {
+                .setNegativeButton("Exit", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
                         MainActivity.this.finish();
                     }
                 });
@@ -125,7 +159,7 @@ public class MainActivity extends AppCompatActivity {
         alertDialog.show();
     }
 
-    private void showEmotionDialog(String emotion){
+    private void showEmotionDialog(String emotion) {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
                 context);
 
@@ -133,9 +167,9 @@ public class MainActivity extends AppCompatActivity {
         alertDialogBuilder
                 .setMessage(emotion)
                 .setCancelable(false)
-                .setNegativeButton("Yay!",new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog,int id) {
-                       dialog.dismiss();
+                .setNegativeButton("Yay!", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        dialog.dismiss();
                     }
                 });
 
@@ -143,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
         alertDialog.show();
     }
 
-    private class UploadImage extends AsyncTask <String, Void, Basic>{
+    private class UploadImage extends AsyncTask<String, Void, Basic> {
 
         ProgressDialog progressDialog;
 
@@ -157,9 +191,9 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected Basic doInBackground(String... strings) {
-            try{
+            try {
                 return Basic.getResponse(strings[0]);
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
@@ -171,16 +205,16 @@ public class MainActivity extends AppCompatActivity {
             super.onPostExecute(basic);
             progressDialog.hide();
 
-            if (basic != null){
+            if (basic != null) {
                 Log.d("MainActivity", basic.getData().getLink());
-                new GetFace().execute(basic.getData().getLink());
-            }else {
+                //    new GetFace().execute(basic.getData().getLink());
+            } else {
                 Toast.makeText(context, "Imgur error", Toast.LENGTH_LONG).show();
             }
         }
     }
 
-    private class GetFace extends AsyncTask<String, Void, Face>{
+    private class GetFace extends AsyncTask<InputStream, Void, Face> {
 
         ProgressDialog progressDialog;
 
@@ -193,10 +227,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected Face doInBackground(String... strings) {
-            try{
+        protected Face doInBackground(InputStream... strings) {
+            try {
                 return Face.getFace(strings[0]);
-            }catch (Exception e){
+            } catch (Exception e) {
 
             }
 
@@ -207,7 +241,7 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(Face face) {
             super.onPostExecute(face);
             progressDialog.hide();
-            if (face != null && face.getScores() != null){
+            if (face != null && face.getScores() != null) {
                 Scores scores = face.getScores();
 
                 HashMap<String, Double> hm = new HashMap<>();
@@ -222,10 +256,8 @@ public class MainActivity extends AppCompatActivity {
 
                 Map.Entry<String, Double> maxEntry = null;
 
-                for (Map.Entry<String, Double> entry : hm.entrySet())
-                {
-                    if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0)
-                    {
+                for (Map.Entry<String, Double> entry : hm.entrySet()) {
+                    if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
                         maxEntry = entry;
                     }
                 }
@@ -233,7 +265,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("MainActivity", maxEntry.getKey());
                 showEmotionDialog(StringHelper.cap1stChar(maxEntry.getKey()));
 
-            }else {
+            } else {
                 Toast.makeText(context, "Emotion error", Toast.LENGTH_LONG).show();
             }
         }
