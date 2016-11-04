@@ -104,14 +104,18 @@ public class MainActivity extends AppCompatActivity {
                     Bitmap bitmap = ImageHelper.loadSizeLimitedBitmapFromUri(
                             imageUri, getContentResolver());
 
-                    image.setImageBitmap(bitmap);
+                    if (bitmap != null){
+                        image.setImageBitmap(bitmap);
 
-                    ByteArrayOutputStream output = new ByteArrayOutputStream();
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output);
-                    ByteArrayInputStream inputStream = new ByteArrayInputStream(output.toByteArray());
+                        ByteArrayOutputStream output = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output);
+                        ByteArrayInputStream inputStream = new ByteArrayInputStream(output.toByteArray());
 
-                    Log.d("MainActivity", inputStream.toString());
-                    new GetFace().execute(inputStream);
+                        Log.d("MainActivity", inputStream.toString());
+                        new GetFace().execute(inputStream);
+                    }else {
+                        Toast.makeText(context, "Image is null", Toast.LENGTH_LONG).show();
+                    }
                 }
             }
         }
@@ -223,6 +227,7 @@ public class MainActivity extends AppCompatActivity {
             super.onPreExecute();
             progressDialog = ProgressDialog.show(context, "Processing Image", "Is this really a face?", true);
             progressDialog.setCancelable(true);
+            progressDialog.setCanceledOnTouchOutside(false);
             progressDialog.show();
         }
 
